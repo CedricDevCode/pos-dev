@@ -145,8 +145,4 @@ function useToast() {
   };
 }
 
-// EXPORT CORRIGÉ - Ajoutez cette ligne
 export { useToast, toast };
-
-// Export par défaut pour compatibilité
-export default { useToast, toast };

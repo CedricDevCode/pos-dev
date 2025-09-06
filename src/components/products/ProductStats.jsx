@@ -1,74 +1,42 @@
 import React from 'react';
 import { motion } from 'framer-motion';
-import { Package, Eye, AlertTriangle, X } from 'lucide-react';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { DollarSign, Package, AlertTriangle } from 'lucide-react';
 
 const ProductStats = ({ produits }) => {
-  const statistiques = {
-    total: produits.length,
-    actifs: produits.filter(p => p.actif).length,
-    stockFaible: produits.filter(p => p.stock <= p.stockMin && p.stock > 0).length,
-    rupture: produits.filter(p => p.stock === 0).length
-  };
+  const valeurTotaleStock = produits.reduce((acc, p) => acc + (p.prixAchat * p.stock), 0);
+  const produitsActifs = produits.filter(p => p.actif).length;
+  const produitsInactifs = produits.length - produitsActifs;
+  const produitsEnRupture = produits.filter(p => p.stock === 0).length;
 
-  const statCards = [
-    { 
-      title: 'Total Produits', 
-      value: statistiques.total, 
-      Icon: Package, 
-      color: 'blue',
-      bgColor: 'bg-blue-500',
-      gradient: 'from-blue-500 to-blue-400'
-    },
-    { 
-      title: 'Produits Actifs', 
-      value: statistiques.actifs, 
-      Icon: Eye, 
-      color: 'green',
-      bgColor: 'bg-green-500',
-      gradient: 'from-green-500 to-green-400'
-    },
-    { 
-      title: 'Stock Faible', 
-      value: statistiques.stockFaible, 
-      Icon: AlertTriangle, 
-      color: 'orange',
-      bgColor: 'bg-orange-500',
-      gradient: 'from-orange-500 to-orange-400'
-    },
-    { 
-      title: 'En Rupture', 
-      value: statistiques.rupture, 
-      Icon: X, 
-      color: 'red',
-      bgColor: 'bg-red-500',
-      gradient: 'from-red-500 to-red-400'
-    },
+  const stats = [
+    { title: "Valeur Totale du Stock", value: `${valeurTotaleStock.toLocaleString('fr-FR', { style: 'currency', currency: 'XOF' })}`, icon: DollarSign, color: "text-green-500" },
+    { title: "Produits Actifs", value: produitsActifs, icon: Package, color: "text-blue-500" },
+    { title: "Produits en Rupture", value: produitsEnRupture, icon: AlertTriangle, color: "text-red-500" },
   ];
 
   return (
-    <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
-      {statCards.map((card, index) => (
+    <div className="grid gap-4 md:grid-cols-3">
+      {stats.map((stat, index) => (
         <motion.div
-          key={card.title}
+          key={stat.title}
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ delay: index * 0.1 }}
-          className="bg-white dark:bg-gray-800 p-6 rounded-xl shadow-lg border border-gray-200 dark:border-gray-700"
         >
-          <div className="flex items-center justify-between">
-            <div>
-              <p className="text-sm font-medium text-gray-600 dark:text-gray-400">{card.title}</p>
-              <p className="text-2xl font-bold text-gray-900 dark:text-white">{card.value}</p>
-            </div>
-            <div className={`w-12 h-12 ${card.bgColor} rounded-lg flex items-center justify-center`}>
-              <card.Icon className="w-6 h-6 text-white" />
-            </div>
-          </div>
+          <Card>
+            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+              <CardTitle className="text-sm font-medium">{stat.title}</CardTitle>
+              <stat.icon className={`h-4 w-4 text-muted-foreground ${stat.color}`} />
+            </CardHeader>
+            <CardContent>
+              <div className="text-2xl font-bold">{stat.value}</div>
+            </CardContent>
+          </Card>
         </motion.div>
       ))}
     </div>
   );
 };
 
-// EXPORT PAR DÉFAUT AJOUTÉ ICI
 export default ProductStats;

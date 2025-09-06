@@ -1,63 +1,48 @@
-import React from "react";
-import { Input } from "@/components/ui/input";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import React from 'react';
+import { Input } from '@/components/ui/input';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Search } from 'lucide-react';
 
-/**
- * StockFilters : composant qui affiche les filtres de recherche
- * - recherche par nom de produit
- * - filtre par catégorie (prop venant de GestionStock, calculée via AppContext)
- * - filtre par état du stock
- */
-const StockFilters = ({
-  recherche,
-  setRecherche,
-  categorieFiltre,
-  setCategorieFiltre,
-  stockFiltre,
-  setStockFiltre,
-  categories // <-- vient de GestionStock
+const StockFilters = ({ 
+  recherche, 
+  setRecherche, 
+  categorieFiltre, 
+  setCategorieFiltre, 
+  stockFiltre, 
+  setStockFiltre, 
+  categories 
 }) => {
   return (
-    <div className="flex gap-4 flex-wrap items-center">
-      {/* Recherche */}
-      <Input
-        placeholder="Rechercher un produit..."
-        value={recherche}
-        onChange={(e) => setRecherche(e.target.value)}
-        className="w-64"
-      />
-
-      {/* Filtre par catégorie */}
-      <Select
-        value={categorieFiltre}
-        onValueChange={(val) => setCategorieFiltre(val)}
-      >
-        <SelectTrigger className="w-48">
+    <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+      <div className="relative">
+        <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+        <Input
+          placeholder="Rechercher un produit..."
+          value={recherche}
+          onChange={(e) => setRecherche(e.target.value)}
+          className="pl-10"
+        />
+      </div>
+      <Select value={categorieFiltre} onValueChange={setCategorieFiltre}>
+        <SelectTrigger>
           <SelectValue placeholder="Toutes les catégories" />
         </SelectTrigger>
         <SelectContent>
-          {/* Valeur spéciale pour "toutes les catégories" */}
-          <SelectItem value="toutes">Toutes les catégories</SelectItem>
-          {categories.map((cat, i) => (
-            <SelectItem key={i} value={cat}>
-              {cat}
-            </SelectItem>
+          <SelectItem value="">Toutes les catégories</SelectItem>
+          {categories.map((cat) => (
+            <SelectItem key={cat} value={cat}>{cat}</SelectItem>
           ))}
         </SelectContent>
       </Select>
-
-      {/* Filtre par stock */}
-      <Select
-        value={stockFiltre}
-        onValueChange={(val) => setStockFiltre(val)}
-      >
-        <SelectTrigger className="w-48">
-          <SelectValue placeholder="État du stock" />
+      <Select value={stockFiltre} onValueChange={setStockFiltre}>
+        <SelectTrigger>
+          <SelectValue placeholder="Tous les stocks" />
         </SelectTrigger>
         <SelectContent>
-          <SelectItem value="tous">Tous</SelectItem>
-          <SelectItem value="disponible">Disponible</SelectItem>
-          <SelectItem value="rupture">En rupture</SelectItem>
+          <SelectItem value="tous">Tous les stocks</SelectItem>
+          <SelectItem value="faible">Stock faible</SelectItem>
+          <SelectItem value="rupture">En rupture de stock</SelectItem>
+          <SelectItem value="normal">Stock suffisant</SelectItem>
         </SelectContent>
       </Select>
     </div>

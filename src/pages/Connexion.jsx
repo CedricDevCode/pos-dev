@@ -3,7 +3,7 @@ import { motion } from 'framer-motion';
 import { Helmet } from 'react-helmet';
 import { Eye, EyeOff, Store, Lock, Mail } from 'lucide-react';
 import { Button } from '@/components/ui/button';
-import { useApp } from '@/hooks/useApp';
+import { useApp } from '@/contexts/AppContext';
 import { useToast } from '@/components/ui/use-toast';
 
 const Connexion = () => {

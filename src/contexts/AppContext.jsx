@@ -1,284 +1,337 @@
-import React, { createContext, useState, useEffect, useCallback, useContext } from "react";
-import { donneesInitiales } from "@/contexts/donneesInitiales";
+import React, { createContext, useContext, useState, useEffect, useCallback } from 'react';
+import { donneesInitiales } from '@/contexts/donneesInitiales';
 
-// 🔹 Création du contexte
+// Création du contexte de l'application
 const AppContext = createContext();
 
-// 🔹 Hook personnalisé pour simplifier l'accès au contexte
-export const useAppContext = () => useContext(AppContext);
+/**
+ * Hook personnalisé pour accéder facilement au contexte de l'application.
+ * @returns {object} Le contexte de l'application.
+ */
+export const useApp = () => {
+  const context = useContext(AppContext);
+  if (!context) {
+    throw new Error('useApp doit être utilisé dans un AppProvider');
+  }
+  return context;
+};
 
-// 🔹 Provider
-const AppProvider = ({ children }) => {
+/**
+ * Fournisseur de contexte qui enveloppe l'application et gère l'état global.
+ * @param {object} props - Les propriétés du composant.
+ * @param {React.ReactNode} props.children - Les composants enfants.
+ */
+export const AppProvider = ({ children }) => {
+  // États pour les données de l'application
   const [utilisateurConnecte, setUtilisateurConnecte] = useState(null);
   const [activiteActive, setActiviteActive] = useState(null);
   const [modeSombre, setModeSombre] = useState(false);
-
+  
   const [utilisateurs, setUtilisateurs] = useState([]);
   const [activites, setActivites] = useState([]);
   const [produits, setProduits] = useState([]);
-  const [categories, setCategories] = useState([]);
   const [ventes, setVentes] = useState([]);
   const [caisses, setCaisses] = useState([]);
-  const [tauxTaxe, setTauxTaxe] = useState(18);
-
-  // 🔹 Panier
-  const [panier, setPanier] = useState([]);
-
-  const [caisseStatus, setCaisseStatus] = useState({
-    estOuverte: false,
-    dateOuverture: null,
-    solde: 0,
-    fondsInitial: 0,
-    utilisateurOuverture: null,
-  });
-
+  const [categories, setCategories] = useState([]);
+  const [retours, setRetours] = useState([]);
+  const [depenses, setDepenses] = useState([]);
+  
   const [chargementInitial, setChargementInitial] = useState(true);
   const [erreur, setErreur] = useState(null);
 
-  // --- Fonctions caisse ---
-  const ouvrirCaisse = useCallback(
-    (montant) => {
-      setCaisseStatus({
-        estOuverte: true,
-        fondsInitial: montant,
-        solde: montant,
-        dateOuverture: new Date().toISOString(),
-        utilisateurOuverture: utilisateurConnecte?.id || null,
-      });
-    },
-    [utilisateurConnecte]
-  );
-
-  const fermerCaisse = useCallback(() => {
-    setCaisseStatus((prev) => ({ ...prev, estOuverte: false }));
-  }, []);
-
-  // --- Gestion du panier ---
-  const ajouterAuPanier = useCallback(
-    (produit) => {
-      if (!caisseStatus.estOuverte) return { success: false, message: "Caisse fermée" };
-
-      const itemExistant = panier.find((item) => item.id === produit.id);
-
-      if (itemExistant) {
-        if (itemExistant.quantite < produit.stock) {
-          setPanier(
-            panier.map((item) =>
-              item.id === produit.id ? { ...item, quantite: item.quantite + 1 } : item
-            )
-          );
-          return { success: true };
-        } else {
-          return { success: false, message: "Stock insuffisant" };
-        }
-      } else {
-        if (produit.stock > 0) {
-          setPanier((prev) => [...prev, { ...produit, quantite: 1 }]);
-          return { success: true };
-        } else {
-          return { success: false, message: "Produit en rupture" };
-        }
-      }
-    },
-    [panier, caisseStatus.estOuverte]
-  );
-
-  const modifierQuantitePanier = useCallback(
-    (id, nouvelleQuantite) => {
-      if (!caisseStatus.estOuverte) return { success: false, message: "Caisse fermée" };
-
-      if (nouvelleQuantite <= 0) {
-        setPanier((prev) => prev.filter((item) => item.id !== id));
-        return { success: true };
-      }
-
-      const produit = produits.find((p) => p.id === id);
-      if (!produit) return { success: false, message: "Produit introuvable" };
-      if (nouvelleQuantite > produit.stock) return { success: false, message: "Stock insuffisant" };
-
-      setPanier((prev) =>
-        prev.map((item) => (item.id === id ? { ...item, quantite: nouvelleQuantite } : item))
-      );
-
-      return { success: true };
-    },
-    [produits, caisseStatus.estOuverte]
-  );
-
-  const viderPanier = useCallback(() => setPanier([]), []);
-
-  // --- Gestion des ventes ---
-  const ajouterVente = useCallback(
-    (vente) => {
-      const numero = ventes.length + 1;
-      const venteAvecNumero = { ...vente, numero, dateVente: new Date().toISOString() };
-      setVentes((prev) => [...prev, venteAvecNumero]);
-      return venteAvecNumero;
-    },
-    [ventes]
-  );
-
-  // --- Finaliser la vente (pour PaymentModal) ---
-  const finaliserVente = useCallback(
-    ({ modesPaiement, montantRecu, monnaieRendue }) => {
-      if (!caisseStatus.estOuverte) return null;
-
-      const sousTotal = panier.reduce((total, item) => total + item.prix * item.quantite, 0);
-      const montantTaxe = (sousTotal * tauxTaxe) / 100;
-      const totalGeneral = sousTotal + montantTaxe;
-
-      const vente = {
-        id: ventes.length + 1,
-        articles: panier,
-        sousTotal,
-        taxe: montantTaxe,
-        total: totalGeneral,
-        modesPaiement,
-        montantRecu,
-        monnaieRendue,
-        utilisateurId: utilisateurConnecte?.id || null,
-        dateVente: new Date().toISOString(),
-      };
-
-      setVentes((prev) => [...prev, vente]);
-
-      // Décrémenter le stock des produits vendus
-      setProduits((prev) =>
-        prev.map((p) => {
-          const vendu = panier.find((item) => item.id === p.id);
-          return vendu ? { ...p, stock: p.stock - vendu.quantite } : p;
-        })
-      );
-
-      // Mettre à jour le solde de la caisse
-      setCaisseStatus((prev) => ({
-        ...prev,
-        solde: prev.solde + totalGeneral,
-      }));
-
-      // Vider le panier
-      setPanier([]);
-
-      return vente;
-    },
-    [panier, tauxTaxe, ventes, caisseStatus, utilisateurConnecte]
-  );
-
-  // --- Sauvegarde / Chargement des données ---
+  /**
+   * Sauvegarde l'ensemble des données de l'application dans le localStorage.
+   */
   const sauvegarderDonnees = useCallback(() => {
     try {
-      const donnees = { utilisateurs, activites, produits, categories, ventes, caisses };
-      localStorage.setItem("pos-donnees", JSON.stringify(donnees));
+      const donnees = { utilisateurs, activites, produits, ventes, caisses, categories, retours, depenses };
+      localStorage.setItem('pos-donnees', JSON.stringify(donnees));
     } catch (error) {
-      console.error("Erreur lors de la sauvegarde:", error);
+      console.error('Erreur lors de la sauvegarde:', error);
     }
-  }, [utilisateurs, activites, produits, categories, ventes, caisses]);
+  }, [utilisateurs, activites, produits, ventes, caisses, categories, retours, depenses]);
 
+  /**
+   * Sauvegarde les préférences de l'utilisateur (thème, activité active) dans le localStorage.
+   */
   const sauvegarderPreferences = useCallback(() => {
     try {
-      const preferences = { modeSombre, activiteActiveId: activiteActive?.id, caisseStatus, panier };
-      localStorage.setItem("pos-preferences", JSON.stringify(preferences));
+      const preferences = { modeSombre, activiteActiveId: activiteActive?.id };
+      localStorage.setItem('pos-preferences', JSON.stringify(preferences));
     } catch (error) {
-      console.error("Erreur lors de la sauvegarde des préférences:", error);
+      console.error('Erreur lors de la sauvegarde des préférences:', error);
     }
-  }, [modeSombre, activiteActive, caisseStatus, panier]);
+  }, [modeSombre, activiteActive]);
 
+  /**
+   * Charge les données et les préférences depuis le localStorage ou utilise les données initiales.
+   */
   const chargerDonnees = useCallback(async () => {
     try {
-      const donneesStockees = localStorage.getItem("pos-donnees");
+      const donneesStockees = localStorage.getItem('pos-donnees');
       let donnees = donneesStockees ? JSON.parse(donneesStockees) : donneesInitiales;
-      if (!donneesStockees) localStorage.setItem("pos-donnees", JSON.stringify(donneesInitiales));
-
+      
+      if (!donneesStockees) {
+        localStorage.setItem('pos-donnees', JSON.stringify(donneesInitiales));
+        donnees = donneesInitiales;
+      }
+      
       setUtilisateurs(donnees.utilisateurs || []);
       setActivites(donnees.activites || []);
       setProduits(donnees.produits || []);
-      setCategories(donnees.categories || []);
       setVentes(donnees.ventes || []);
       setCaisses(donnees.caisses || []);
-
-      const preferences = localStorage.getItem("pos-preferences");
-      let activiteParDefaut = donnees.activites?.[0] || null;
-      let panierCharge = [];
+      setCategories(donnees.categories || []);
+      setRetours(donnees.retours || []);
+      setDepenses(donnees.depenses || []);
+      
+      const preferences = localStorage.getItem('pos-preferences');
+      let activiteParDefaut = donnees.activites && donnees.activites.length > 0 ? donnees.activites[0] : null;
 
       if (preferences) {
         const prefs = JSON.parse(preferences);
         setModeSombre(prefs.modeSombre || false);
-
-        if (prefs.caisseStatus) {
-          const maintenant = new Date();
-          const dateOuverture = new Date(prefs.caisseStatus.dateOuverture);
-          const differenceHeures = (maintenant - dateOuverture) / (1000 * 60 * 60);
-          if (differenceHeures < 24) setCaisseStatus(prefs.caisseStatus);
+        if(prefs.activiteActiveId) {
+            const activiteTrouvee = donnees.activites.find(a => a.id === prefs.activiteActiveId);
+            if(activiteTrouvee) activiteParDefaut = activiteTrouvee;
         }
-
-        if (prefs.activiteActiveId) {
-          const activiteTrouvee = donnees.activites.find((a) => a.id === prefs.activiteActiveId);
-          if (activiteTrouvee) activiteParDefaut = activiteTrouvee;
-        }
-
-        if (prefs.panier) panierCharge = prefs.panier;
       }
 
       setActiviteActive(activiteParDefaut);
-      setPanier(panierCharge);
 
-      const utilisateurStocke = localStorage.getItem("pos-utilisateur-connecte");
-      if (utilisateurStocke) setUtilisateurConnecte(JSON.parse(utilisateurStocke));
+      const utilisateurStocke = localStorage.getItem('pos-utilisateur-connecte');
+      if (utilisateurStocke) {
+          setUtilisateurConnecte(JSON.parse(utilisateurStocke));
+      }
+
     } catch (error) {
-      console.error("Erreur lors du chargement:", error);
-      setErreur("Impossible de charger les données");
+      console.error('Erreur lors du chargement des données:', error);
+      setErreur('Impossible de charger les données');
     } finally {
-      setChargementInitial(false);
+        setChargementInitial(false);
     }
   }, []);
 
-  useEffect(() => { chargerDonnees(); }, [chargerDonnees]);
-  useEffect(() => { if (!chargementInitial) sauvegarderDonnees(); }, [utilisateurs, activites, produits, categories, ventes, caisses, chargementInitial, sauvegarderDonnees]);
-  useEffect(() => { if (!chargementInitial) sauvegarderPreferences(); }, [modeSombre, activiteActive, caisseStatus, panier, chargementInitial, sauvegarderPreferences]);
+  // Effet pour charger les données au montage initial du composant
+  useEffect(() => {
+    chargerDonnees();
+  }, [chargerDonnees]);
 
-  // --- Statistiques ---
-  const obtenirStatistiques = useCallback(() => {
-    const aujourdHui = new Date();
-    const hier = new Date();
-    hier.setDate(hier.getDate() - 1);
+  // Effet pour sauvegarder les données à chaque modification (après le chargement initial)
+  useEffect(() => {
+    if(!chargementInitial) sauvegarderDonnees();
+  }, [utilisateurs, activites, produits, ventes, caisses, categories, retours, depenses, chargementInitial, sauvegarderDonnees]);
 
-    const ventesAujourdhui = ventes.filter((v) => new Date(v.dateVente).toDateString() === aujourdHui.toDateString());
-    const ventesHier = ventes.filter((v) => new Date(v.dateVente).toDateString() === hier.toDateString());
+  // Effet pour sauvegarder les préférences à chaque modification (après le chargement initial)
+  useEffect(() => {
+    if(!chargementInitial) sauvegarderPreferences();
+  }, [modeSombre, activiteActive, chargementInitial, sauvegarderPreferences]);
 
-    const chiffresAffairesAujourdhui = ventesAujourdhui.reduce((t, v) => t + v.total, 0);
-    const chiffresAffairesHier = ventesHier.reduce((t, v) => t + v.total, 0);
+  /**
+   * Gère la connexion d'un utilisateur.
+   * @param {string} email - L'email de l'utilisateur.
+   * @param {string} motDePasse - Le mot de passe de l'utilisateur.
+   * @returns {boolean} True si la connexion est réussie, sinon false.
+   */
+  const connecterUtilisateur = (email, motDePasse) => {
+    const utilisateur = utilisateurs.find(u => 
+      u.email === email && u.motDePasse === motDePasse && u.actif
+    );
+    
+    if (utilisateur) {
+      setUtilisateurConnecte(utilisateur);
+      localStorage.setItem('pos-utilisateur-connecte', JSON.stringify(utilisateur));
+      return true;
+    }
+    return false;
+  };
 
-    const nombreVentesAujourdhui = ventesAujourdhui.length;
-    const nombreVentesHier = ventesHier.length;
+  /**
+   * Gère la déconnexion de l'utilisateur.
+   */
+  const deconnecterUtilisateur = () => {
+    setUtilisateurConnecte(null);
+    localStorage.removeItem('pos-utilisateur-connecte');
+  };
 
-    const produitsEnRupture = produits.filter((p) => p.stock <= p.stockMin);
+  // Fonctions de modification de l'état global
+  const basculerModeSombre = () => setModeSombre(prev => !prev);
+  const changerActiviteActive = (activite) => setActiviteActive(activite);
 
-    const objectifMensuel = 3000000;
-    const debutMois = new Date(aujourdHui.getFullYear(), aujourdHui.getMonth(), 1);
-    const ventesMois = ventes.filter((v) => new Date(v.dateVente) >= debutMois);
-    const caMois = ventesMois.reduce((t, v) => t + v.total, 0);
-    const progressionObjectif = ((caMois / objectifMensuel) * 100).toFixed(1);
+  const ajouterVente = (nouvelleVente) => {
+    setVentes(prev => [...prev, nouvelleVente]);
+    nouvelleVente.articles.forEach(article => {
+      setProduits(prev => prev.map(produit => 
+        produit.id === article.produitId 
+          ? { ...produit, stock: produit.stock - article.quantite }
+          : produit
+      ));
+    });
+    return nouvelleVente;
+  };
+  
+  const ajouterRetour = (nouveauRetour) => {
+    setRetours(prev => [...prev, nouveauRetour]);
+    nouveauRetour.articles.forEach(article => {
+      setProduits(prev => prev.map(produit =>
+        produit.id === article.produitId
+          ? { ...produit, stock: produit.stock + article.quantite }
+          : produit
+      ));
+    });
+    // Mettre à jour la vente originale pour indiquer qu'un retour a eu lieu
+    setVentes(prev => prev.map(v => 
+      v.numero === nouveauRetour.numeroVenteOriginale
+        ? { ...v, statut: 'retour partiel' }
+        : v
+    ));
+    return nouveauRetour;
+  };
 
-    const ventesParActivite = activites.map((act) => ({
-      activite: act.nom,
-      chiffresAffaires: ventes.filter((v) => v.activiteId === act.id).reduce((t, v) => t + v.total, 0),
+  const ouvrirCaisse = (soldeInitial) => {
+    const nouvelleSession = {
+      id: Date.now(),
+      activiteId: activiteActive.id,
+      utilisateurId: utilisateurConnecte.id,
+      soldeInitial,
+      dateOuverture: new Date().toISOString(),
+      statut: 'ouverte',
+      ventes: []
+    };
+    setCaisses(prev => [...prev, nouvelleSession]);
+    return nouvelleSession;
+  };
+
+  const fermerCaisse = (sessionId, detailsCloture) => {
+    setCaisses(prev => prev.map(c => 
+      c.id === sessionId 
+        ? { ...c, ...detailsCloture, statut: 'fermee', dateFermeture: new Date().toISOString() } 
+        : c
+    ));
+  };
+  
+  const ajouterVenteASessionCaisse = (sessionId, vente) => {
+    setCaisses(prev => prev.map(c => 
+      c.id === sessionId && c.statut === 'ouverte'
+        ? { ...c, ventes: [...c.ventes, vente] }
+        : c
+    ));
+  };
+
+  const ajouterProduit = (nouveauProduit) => {
+    const produit = { ...nouveauProduit, id: Date.now(), dateCreation: new Date().toISOString(), actif: true };
+    setProduits(prev => [...prev, produit]);
+    return produit;
+  };
+
+  const modifierProduit = (id, donneesModifiees) => {
+    setProduits(prev => prev.map(p => p.id === id ? { ...p, ...donneesModifiees } : p));
+  };
+
+  const supprimerProduit = (id) => {
+    setProduits(prev => prev.filter(p => p.id !== id));
+  };
+
+  const ajouterActivite = (nouvelleActivite) => {
+    const activite = { ...nouvelleActivite, id: Date.now(), dateCreation: new Date().toISOString(), actif: true };
+    setActivites(prev => [...prev, activite]);
+    return activite;
+  };
+
+  const modifierActivite = (id, donneesModifiees) => {
+    setActivites(prev => prev.map(a => a.id === id ? { ...a, ...donneesModifiees } : a));
+    if (activiteActive?.id === id) {
+      setActiviteActive(prev => ({ ...prev, ...donneesModifiees }));
+    }
+  };
+
+  const supprimerActivite = (id) => {
+    setActivites(prev => prev.filter(a => a.id !== id));
+  };
+
+  const ajouterCategorie = (nouvelleCategorie) => {
+    const categorie = { ...nouvelleCategorie, id: Date.now() };
+    setCategories(prev => [...prev, categorie]);
+    return categorie;
+  };
+
+  const modifierCategorie = (id, donneesModifiees) => {
+    setCategories(prev => prev.map(c => c.id === id ? { ...c, ...donneesModifiees } : c));
+  };
+
+  const supprimerCategorie = (id) => {
+    const produitsAssocies = produits.filter(p => p.categorie === categories.find(c=>c.id === id)?.nom && p.activiteId === activiteActive?.id).length;
+    if (produitsAssocies > 0) {
+      throw new Error(`Cette catégorie est utilisée par ${produitsAssocies} produit(s).`);
+    }
+    setCategories(prev => prev.filter(c => c.id !== id));
+  };
+
+  const modifierUtilisateur = (id, donneesModifiees) => {
+    setUtilisateurs(prev => prev.map(u => {
+      if (u.id === id) {
+        const utilisateurMaj = { ...u, ...donneesModifiees };
+        if (!donneesModifiees.motDePasse) {
+          delete utilisateurMaj.motDePasse;
+        } else {
+          utilisateurMaj.motDePasse = donneesModifiees.motDePasse;
+        }
+        delete utilisateurMaj.confirmMotDePasse;
+        
+        if (utilisateurConnecte.id === id) {
+          setUtilisateurConnecte(utilisateurMaj);
+          localStorage.setItem('pos-utilisateur-connecte', JSON.stringify(utilisateurMaj));
+        }
+        return utilisateurMaj;
+      }
+      return u;
     }));
+  };
 
+  const ajouterDepense = (nouvelleDepense) => {
+    const depense = { ...nouvelleDepense, id: `dep-${Date.now()}` };
+    setDepenses(prev => [...prev, depense]);
+    return depense;
+  };
+
+  const modifierDepense = (donneesModifiees) => {
+    setDepenses(prev => prev.map(d => d.id === donneesModifiees.id ? { ...d, ...donneesModifiees } : d));
+  };
+
+  const supprimerDepense = (id) => {
+    setDepenses(prev => prev.filter(d => d.id !== id));
+  };
+
+  /**
+   * Calcule et retourne des statistiques clés de l'application.
+   * @returns {object} Un objet contenant diverses statistiques.
+   */
+  const obtenirStatistiques = useCallback(() => {
+    const aujourdhui = new Date().toDateString();
+    const ventesAujourdhui = ventes.filter(v => new Date(v.dateVente).toDateString() === aujourdhui);
+    
+    const chiffresAffairesAujourdhui = ventesAujourdhui.reduce((total, v) => total + v.total, 0);
+    const nombreVentesAujourdhui = ventesAujourdhui.length;
+    const produitsEnRupture = produits.filter(p => p.stock <= p.stockMin);
+    
+    const ventesParActivite = activites.map(act => ({
+      activite: act.nom,
+      ventes: ventes.filter(v => v.activiteId === act.id).length,
+      chiffresAffaires: ventes
+        .filter(v => v.activiteId === act.id)
+        .reduce((total, v) => total + v.total, 0)
+    }));
+    
     return {
       chiffresAffairesAujourdhui,
-      chiffresAffairesHier,
       nombreVentesAujourdhui,
-      nombreVentesHier,
       produitsEnRupture: produitsEnRupture.length,
-      produitsStockFaible: produitsEnRupture,
-      objectifMensuel,
-      caMois,
-      progressionObjectif,
       ventesParActivite,
+      produitsStockFaible: produitsEnRupture
     };
   }, [ventes, produits, activites]);
 
-  // --- Valeur exposée ---
+  // Objet de valeur du contexte, contenant tous les états et fonctions à partager
   const valeurContexte = {
     utilisateurConnecte,
     activiteActive,
@@ -288,33 +341,46 @@ const AppProvider = ({ children }) => {
     utilisateurs,
     activites,
     produits,
-    categories,
     ventes,
+    retours,
     caisses,
-    caisseStatus,
-    tauxTaxe,
-    panier,
-    setPanier,
-    ajouterAuPanier,
-    modifierQuantitePanier,
-    viderPanier,
-    setTauxTaxe,
+    categories,
+    depenses,
+    chargerDonnees,
+    connecterUtilisateur,
+    deconnecterUtilisateur,
+    basculerModeSombre,
+    changerActiviteActive,
+    ajouterVente,
+    ajouterRetour,
+    ouvrirCaisse,
+    fermerCaisse,
+    ajouterVenteASessionCaisse,
+    ajouterProduit,
+    modifierProduit,
+    supprimerProduit,
+    ajouterActivite,
+    modifierActivite,
+    supprimerActivite,
+    ajouterCategorie,
+    modifierCategorie,
+    supprimerCategorie,
+    obtenirStatistiques,
     setUtilisateurs,
     setActivites,
     setProduits,
-    setCategories,
     setVentes,
     setCaisses,
-    basculerModeSombre: () => setModeSombre((p) => !p),
-    changerActiviteActive: (a) => setActiviteActive(a),
-    obtenirStatistiques,
-    ouvrirCaisse,
-    fermerCaisse,
-    ajouterVente,
-    finaliserVente, // ✅ ajout pour PaymentModal
+    setCategories,
+    modifierUtilisateur,
+    ajouterDepense,
+    modifierDepense,
+    supprimerDepense,
   };
 
-  return <AppContext.Provider value={valeurContexte}>{children}</AppContext.Provider>;
+  return (
+    <AppContext.Provider value={valeurContexte}>
+      {children}
+    </AppContext.Provider>
+  );
 };
-
-export { AppContext, AppProvider };

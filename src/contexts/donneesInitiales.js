@@ -59,6 +59,13 @@ export const donneesInitiales = {
       dateCreation: new Date().toISOString()
     }
   ],
+  categories: [
+    { id: 1, nom: 'Plats principaux', activiteId: 1 },
+    { id: 2, nom: 'Boissons', activiteId: 1 },
+    { id: 3, nom: 'Vêtements Femme', activiteId: 2 },
+    { id: 4, nom: 'Vêtements Homme', activiteId: 2 },
+    { id: 5, nom: 'Maintenance', activiteId: 3 },
+  ],
   produits: [
     {
       id: 1,
@@ -66,7 +73,7 @@ export const donneesInitiales = {
       description: 'Plat traditionnel sénégalais avec poisson et riz',
       prix: 2500,
       cout: 1500,
-      stock: 5,
+      stock: 50,
       stockMin: 10,
       categorie: 'Plats principaux',
       activiteId: 1,
@@ -80,7 +87,7 @@ export const donneesInitiales = {
       description: 'Poulet mariné aux oignons et citron',
       prix: 3000,
       cout: 1800,
-      stock: 5,
+      stock: 30,
       stockMin: 5,
       categorie: 'Plats principaux',
       activiteId: 1,
@@ -158,9 +165,11 @@ export const donneesInitiales = {
       sousTotal: 6000,
       taxe: 1080,
       total: 7080,
-      modePaiement: 'especes',
+      modesPaiement: { especes: 7080, carte: 0, mobileMoney: 0 },
+      montantRecu: 7080,
+      monnaieRendue: 0,
       statut: 'termine',
-      dateVente: new Date().toISOString()
+      date: new Date().toISOString()
     }
   ],
   caisses: [
@@ -169,10 +178,28 @@ export const donneesInitiales = {
       activiteId: 1,
       utilisateurId: 2,
       soldeInitial: 50000,
-      soldeFinal: 57080,
+      soldeFinal: null,
       dateOuverture: new Date().toISOString(),
       dateFermeture: null,
-      statut: 'ouverte'
+      statut: 'ouverte',
+      ventes:[]
+    }
+  ],
+  retours: [],
+  depenses: [
+    {
+      id: 'dep-1',
+      date: new Date(new Date().setDate(new Date().getDate() - 2)).toISOString(),
+      description: 'Achat de fournitures de bureau',
+      montant: 25000,
+      categorie: 'Fournitures'
+    },
+    {
+      id: 'dep-2',
+      date: new Date(new Date().setDate(new Date().getDate() - 5)).toISOString(),
+      description: 'Paiement facture électricité',
+      montant: 35000,
+      categorie: 'Services Publics'
     }
   ]
 };

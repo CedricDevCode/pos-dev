@@ -1,214 +1,246 @@
-import React, { useState, useEffect, useRef } from 'react';
-import { motion } from 'framer-motion';
-import { X, Upload, ChevronDown } from 'lucide-react';
+import React, { useState, useEffect } from 'react';
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogDescription,
+  DialogFooter,
+} from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
+import { Checkbox } from '@/components/ui/checkbox';
+import { useApp } from '@/contexts/AppContext';
 import { useToast } from '@/components/ui/use-toast';
+import { motion, AnimatePresence } from 'framer-motion';
+import { PlusCircle, Upload, X } from 'lucide-react';
 
-const ProductModal = ({ isOpen, onClose, onSubmit, produitToEdit, categories }) => {
+
+const ProductModal = ({ isOpen, onClose, produit }) => {
+  const { activiteActive, categories, ajouterProduit, modifierProduit } = useApp();
   const { toast } = useToast();
-  const fileInputRef = useRef(null);
-  const [selectedFile, setSelectedFile] = useState(null);
-  const [imagePreview, setImagePreview] = useState('');
-  const [isUploading, setIsUploading] = useState(false);
-  const [formData, setFormData] = useState({
-    nom: '', description: '', prix: '', cout: '', stock: '', stockMin: '',
-    categorie: '', image: '', actif: true
-  });
+  
+  const [nom, setNom] = useState('');
+  const [description, setDescription] = useState('');
+  const [categorie, setCategorie] = useState('');
+  const [prixAchat, setPrixAchat] = useState(0);
+  const [prixVente, setPrixVente] = useState(0);
+  const [stock, setStock] = useState(0);
+  const [stockMin, setStockMin] = useState(10);
+  const [image, setImage] = useState(null);
+  const [estActif, setEstActif] = useState(true);
+  const [nouvelleCategorie, setNouvelleCategorie] = useState('');
+  const [showNewCategoryInput, setShowNewCategoryInput] = useState(false);
+
+  const categoriesActivite = categories.filter(c => c.activiteId === activiteActive?.id);
 
   useEffect(() => {
-    if (produitToEdit) {
-      setFormData({
-        nom: produitToEdit.nom,
-        description: produitToEdit.description,
-        prix: produitToEdit.prix.toString(),
-        cout: produitToEdit.cout.toString(),
-        stock: produitToEdit.stock.toString(),
-        stockMin: produitToEdit.stockMin.toString(),
-        categorie: produitToEdit.categorie,
-        image: produitToEdit.image,
-        actif: produitToEdit.actif
-      });
-      setImagePreview(produitToEdit.image || '');
+    if (produit) {
+      setNom(produit.nom);
+      setDescription(produit.description || '');
+      setCategorie(produit.categorie);
+      setPrixAchat(produit.prixAchat || 0);
+      setPrixVente(produit.prixVente);
+      setStock(produit.stock);
+      setStockMin(produit.stockMin);
+      setImage(produit.image || null);
+      setEstActif(produit.actif);
     } else {
-      setFormData({
-        nom: '', description: '', prix: '', cout: '', stock: '', stockMin: '',
-        categorie: '', image: '', actif: true
-      });
-      setImagePreview('');
-      setSelectedFile(null);
+      // Réinitialiser le formulaire pour un nouveau produit
+      setNom('');
+      setDescription('');
+      setCategorie('');
+      setPrixAchat(0);
+      setPrixVente(0);
+      setStock(0);
+      setStockMin(10);
+      setImage(null);
+      setEstActif(true);
     }
-  }, [produitToEdit, isOpen]);
-
-  const handleChange = (e) => {
-    const { name, value, type, checked } = e.target;
-    setFormData(prev => ({ ...prev, [name]: type === 'checkbox' ? checked : value }));
-  };
-
-  const handleFileChange = (e) => {
-    const file = e.target.files[0];
-    if (!file) return;
-
-    if (!file.type.match('image.*')) {
-      toast({ title: "❌ Erreur", description: "Veuillez sélectionner une image valide." });
-      return;
-    }
-    if (file.size > 2 * 1024 * 1024) {
-      toast({ title: "❌ Erreur", description: "L'image ne doit pas dépasser 2MB." });
-      return;
-    }
-
-    setSelectedFile(file);
-    const reader = new FileReader();
-    reader.onload = (e) => {
-      const base64 = e.target.result;
-      setImagePreview(base64);
-      setFormData(prev => ({ ...prev, image: base64 }));
-    };
-    reader.readAsDataURL(file);
-  };
+  }, [produit, isOpen]);
 
   const handleSubmit = (e) => {
     e.preventDefault();
-    if (!formData.nom.trim()) {
-      toast({ title: "❌ Erreur", description: "Le nom du produit est obligatoire." });
+
+    if (!nom || !prixVente) {
+      toast({
+        title: "Erreur de validation",
+        description: "Le nom et le prix de vente sont obligatoires.",
+        variant: "destructive",
+      });
       return;
     }
-    const finalData = {
-      ...formData,
-      prix: parseFloat(formData.prix) || 0,
-      cout: parseFloat(formData.cout) || 0,
-      stock: parseInt(formData.stock) || 0,
-      stockMin: parseInt(formData.stockMin) || 0,
+
+    let finalCategory = categorie;
+    if (showNewCategoryInput && nouvelleCategorie) {
+      finalCategory = nouvelleCategorie;
+      // Note: La logique pour ajouter une nouvelle catégorie devrait être dans le contexte
+    }
+
+    const donneesProduit = {
+      nom,
+      description,
+      categorie: finalCategory,
+      prixAchat: parseFloat(prixAchat),
+      prixVente: parseFloat(prixVente),
+      stock: parseInt(stock, 10),
+      stockMin: parseInt(stockMin, 10),
+      image,
+      actif: estActif,
+      activiteId: activiteActive.id,
     };
-    onSubmit(finalData);
-  };
 
-  const triggerFileInput = () => fileInputRef.current?.click();
-  const removeImage = () => {
-    setSelectedFile(null);
-    setImagePreview('');
-    setFormData(prev => ({ ...prev, image: '' }));
+    if (produit) {
+      modifierProduit(produit.id, donneesProduit);
+      toast({
+        title: "✅ Produit mis à jour",
+        description: `${nom} a été modifié avec succès.`,
+        className: "toast-success"
+      });
+    } else {
+      ajouterProduit(donneesProduit);
+      toast({
+        title: "✨ Produit ajouté",
+        description: `${nom} a été créé avec succès.`,
+        className: "toast-success"
+      });
+    }
+    
+    onClose();
   };
-
-  if (!isOpen) return null;
+  
+  const handleCategoryChange = (value) => {
+    if (value === 'new') {
+      setShowNewCategoryInput(true);
+      setCategorie('');
+    } else {
+      setShowNewCategoryInput(false);
+      setNouvelleCategorie('');
+      setCategorie(value);
+    }
+  }
+  
+  const handleImageUpload = (e) => {
+    const file = e.target.files[0];
+    if (file) {
+      const reader = new FileReader();
+      reader.onloadend = () => {
+        setImage(reader.result);
+      };
+      reader.readAsDataURL(file);
+    }
+  };
 
   return (
-    <motion.div
-      initial={{ opacity: 0 }}
-      animate={{ opacity: 1 }}
-      exit={{ opacity: 0 }}
-      className="fixed inset-0 bg-black bg-opacity-40 flex items-center justify-center z-50 p-4"
-      onClick={onClose}
-    >
-      <motion.div
-        initial={{ scale: 0.95, opacity: 0 }}
-        animate={{ scale: 1, opacity: 1 }}
-        exit={{ scale: 0.95, opacity: 0 }}
-        className="bg-white dark:bg-gray-900 rounded-2xl shadow-2xl max-w-3xl w-full max-h-[90vh] overflow-y-auto p-6"
-        onClick={(e) => e.stopPropagation()}
-      >
-        <div className="flex items-center justify-between mb-6 border-b border-gray-200 dark:border-gray-700 pb-3">
-          <h3 className="text-2xl font-bold text-gray-900 dark:text-white">
-            {produitToEdit ? 'Modifier' : 'Nouveau'} Produit
-          </h3>
-          <button onClick={onClose} className="p-2 rounded-full hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors">
-            <X className="w-5 h-5 text-gray-500 dark:text-gray-400" />
-          </button>
-        </div>
-
-        <form onSubmit={handleSubmit} className="space-y-6">
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-            <div className="space-y-4 bg-gray-50 dark:bg-gray-800 p-5 rounded-xl shadow-inner">
-              <InputField label="Nom *" name="nom" value={formData.nom} onChange={handleChange} required />
-              <TextAreaField label="Description" name="description" value={formData.description} onChange={handleChange} />
-
-              <div className="flex flex-col">
-                <label className="mb-1 text-gray-700 dark:text-gray-300 font-medium">Catégorie</label>
-                <div className="relative">
-                  <select
-                    name="categorie"
-                    value={formData.categorie}
-                    onChange={handleChange}
-                    className="w-full p-3 rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-900 focus:outline-none focus:ring-2 focus:ring-purple-500 appearance-none"
-                  >
-                    <option value="">Sélectionner une catégorie</option>
-                    {categories.filter(c => c.actif).map(c => (
-                      <option key={c.id} value={c.nom}>{c.nom}</option>
-                    ))}
-                  </select>
-                  <ChevronDown className="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-4 h-4 pointer-events-none" />
-                </div>
-              </div>
-
-              <div className="flex flex-col">
-                <label className="mb-1 text-gray-700 dark:text-gray-300 font-medium">Image</label>
-                <input type="file" ref={fileInputRef} onChange={handleFileChange} accept="image/*" className="hidden" />
-                <div className="flex flex-col items-center space-y-3">
-                  <Button type="button" variant="outline" onClick={triggerFileInput} className="w-full flex items-center justify-center gap-2">
-                    <Upload className="w-4 h-4" />
-                    {selectedFile ? "Changer l'image" : "Sélectionner une image"}
-                  </Button>
-                  {imagePreview && (
-                    <div className="relative mt-2">
-                      <img src={imagePreview} alt="Aperçu" className="w-28 h-28 rounded-lg object-cover shadow-md border border-gray-200 dark:border-gray-700" />
-                      <button type="button" onClick={removeImage} className="absolute -top-2 -right-2 bg-red-500 text-white rounded-full p-1 hover:bg-red-600">
-                        <X className="w-4 h-4" />
-                      </button>
-                    </div>
-                  )}
-                </div>
-              </div>
+    <Dialog open={isOpen} onOpenChange={onClose}>
+      <DialogContent className="sm:max-w-[600px] max-h-[90vh] overflow-y-auto">
+        <DialogHeader>
+          <DialogTitle>{produit ? 'Modifier le Produit' : 'Nouveau Produit'}</DialogTitle>
+          <DialogDescription>
+            {produit ? `Mettez à jour les informations de ${produit.nom}.` : `Ajoutez un nouveau produit au catalogue de ${activiteActive?.nom}.`}
+          </DialogDescription>
+        </DialogHeader>
+        <form onSubmit={handleSubmit} className="space-y-4 py-4">
+          <div className="grid grid-cols-3 items-center gap-4">
+            <Label htmlFor="nom" className="text-right">Nom</Label>
+            <Input id="nom" value={nom} onChange={(e) => setNom(e.target.value)} className="col-span-2" placeholder="Ex: T-shirt en coton" required />
+          </div>
+          <div className="grid grid-cols-3 items-center gap-4">
+            <Label htmlFor="description" className="text-right">Description</Label>
+            <Input id="description" value={description} onChange={(e) => setDescription(e.target.value)} className="col-span-2" placeholder="Ex: Couleur, taille, etc."/>
+          </div>
+          <div className="grid grid-cols-3 items-center gap-4">
+            <Label htmlFor="categorie" className="text-right">Catégorie</Label>
+            <div className="col-span-2">
+              <Select onValueChange={handleCategoryChange} value={showNewCategoryInput ? 'new' : categorie}>
+                <SelectTrigger>
+                  <SelectValue placeholder="Sélectionner une catégorie" />
+                </SelectTrigger>
+                <SelectContent>
+                  {categoriesActivite.map((cat) => (
+                    <SelectItem key={cat.id} value={cat.nom}>{cat.nom}</SelectItem>
+                  ))}
+                  <SelectItem value="new">
+                    <span className="flex items-center"><PlusCircle className="mr-2 h-4 w-4"/>Nouvelle catégorie</span>
+                  </SelectItem>
+                </SelectContent>
+              </Select>
+              <AnimatePresence>
+                {showNewCategoryInput && (
+                  <motion.div initial={{ opacity: 0, height: 0 }} animate={{ opacity: 1, height: 'auto' }} exit={{ opacity: 0, height: 0 }} className="mt-2">
+                    <Input value={nouvelleCategorie} onChange={(e) => setNouvelleCategorie(e.target.value)} placeholder="Nom de la nouvelle catégorie" />
+                  </motion.div>
+                )}
+              </AnimatePresence>
             </div>
-
-            <div className="space-y-4 bg-gray-50 dark:bg-gray-800 p-5 rounded-xl shadow-inner">
-              <InputField label="Prix de vente (FCFA) *" name="prix" type="number" value={formData.prix} onChange={handleChange} required />
-              <InputField label="Coût d'achat (FCFA)" name="cout" type="number" value={formData.cout} onChange={handleChange} />
-              <InputField label="Stock" name="stock" type="number" value={formData.stock} onChange={handleChange} />
-              <InputField label="Stock Min" name="stockMin" type="number" value={formData.stockMin} onChange={handleChange} />
-              <div className="flex items-center mt-3">
-                <input type="checkbox" name="actif" id="actifCheck" checked={formData.actif} onChange={handleChange} className="w-5 h-5 text-purple-600 border-gray-300 rounded" />
-                <label htmlFor="actifCheck" className="ml-2 text-gray-700 dark:text-gray-300 cursor-pointer">Produit actif</label>
+          </div>
+          <div className="grid grid-cols-3 gap-4">
+             <div className="col-span-1 grid grid-cols-1 items-center gap-4">
+                <Label htmlFor="prixAchat" className="text-right">Prix d'achat</Label>
+                <Input id="prixAchat" type="number" value={prixAchat} onChange={(e) => setPrixAchat(e.target.value)} placeholder="0" />
+            </div>
+            <div className="col-span-2 grid grid-cols-2 items-center gap-4">
+                <Label htmlFor="prixVente" className="text-right">Prix de vente</Label>
+                <Input id="prixVente" type="number" value={prixVente} onChange={(e) => setPrixVente(e.target.value)} placeholder="0" required />
+            </div>
+          </div>
+          <div className="grid grid-cols-3 gap-4">
+            <div className="col-span-1 grid grid-cols-1 items-center gap-4">
+                <Label htmlFor="stock" className="text-right">Stock</Label>
+                <Input id="stock" type="number" value={stock} onChange={(e) => setStock(e.target.value)} placeholder="0" />
+            </div>
+             <div className="col-span-2 grid grid-cols-2 items-center gap-4">
+                <Label htmlFor="stockMin" className="text-right">Stock min.</Label>
+                <Input id="stockMin" type="number" value={stockMin} onChange={(e) => setStockMin(e.target.value)} placeholder="10"/>
+            </div>
+          </div>
+          <div className="grid grid-cols-3 items-start gap-4">
+            <Label className="text-right pt-2">Image</Label>
+            <div className="col-span-2">
+              <div className="w-full h-32 border-2 border-dashed rounded-lg flex items-center justify-center relative">
+                {image ? (
+                  <>
+                    <img  src={image} alt="Aperçu produit" className="h-full w-full object-contain rounded-lg" src="https://images.unsplash.com/photo-1607212695733-c08334601aeb" />
+                    <Button variant="ghost" size="icon" className="absolute top-1 right-1 h-6 w-6 bg-gray-800/50 hover:bg-gray-800/80 text-white" onClick={() => setImage(null)}>
+                      <X className="h-4 w-4"/>
+                    </Button>
+                  </>
+                ) : (
+                  <div className="text-center">
+                    <Upload className="mx-auto h-8 w-8 text-gray-400"/>
+                    <label htmlFor="image-upload" className="text-sm text-primary cursor-pointer hover:underline font-semibold">
+                      Charger une image
+                    </label>
+                    <p className="text-xs text-gray-500">PNG, JPG, GIF jusqu'à 10MB</p>
+                    <input id="image-upload" type="file" className="sr-only" onChange={handleImageUpload} accept="image/*"/>
+                  </div>
+                )}
               </div>
             </div>
           </div>
-
-          <div className="flex justify-end space-x-4 mt-4">
+          <div className="flex items-center space-x-2 pl-1/3">
+             <div className="w-1/3"></div>
+             <div className="flex items-center space-x-2">
+                <Checkbox id="estActif" checked={estActif} onCheckedChange={setEstActif} />
+                <Label htmlFor="estActif">Produit actif (visible en point de vente)</Label>
+            </div>
+          </div>
+          <DialogFooter>
             <Button type="button" variant="outline" onClick={onClose}>Annuler</Button>
-            <Button type="submit" className="bg-purple-600 hover:bg-purple-700 text-white transition-colors" disabled={isUploading}>
-              {isUploading ? 'Traitement...' : (produitToEdit ? 'Modifier' : 'Créer')}
-            </Button>
-          </div>
+            <Button type="submit">{produit ? 'Enregistrer les modifications' : 'Créer le produit'}</Button>
+          </DialogFooter>
         </form>
-      </motion.div>
-    </motion.div>
+      </DialogContent>
+    </Dialog>
   );
 };
-
-const InputField = ({ label, name, value, onChange, type='text', required }) => (
-  <div className="flex flex-col">
-    <label className="mb-1 text-gray-700 dark:text-gray-300 font-medium">{label}</label>
-    <input
-      type={type}
-      name={name}
-      value={value}
-      onChange={onChange}
-      required={required}
-      className="w-full p-3 rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-900 focus:outline-none focus:ring-2 focus:ring-purple-500"
-    />
-  </div>
-);
-
-const TextAreaField = ({ label, name, value, onChange }) => (
-  <div className="flex flex-col">
-    <label className="mb-1 text-gray-700 dark:text-gray-300 font-medium">{label}</label>
-    <textarea
-      name={name}
-      value={value}
-      onChange={onChange}
-      rows="3"
-      className="w-full p-3 rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-900 focus:outline-none focus:ring-2 focus:ring-purple-500"
-    />
-  </div>
-);
 
 export default ProductModal;

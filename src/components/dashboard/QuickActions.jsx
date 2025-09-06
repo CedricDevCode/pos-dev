@@ -18,36 +18,22 @@ const ActionButton = ({ label, Icon, to, color }) => {
   };
 
   return (
-    <Link 
-      to={to} 
-      className={`flex flex-col items-center justify-center p-4 rounded-lg transition-colors ${colorClasses[color]}`}
-    >
+    <Link to={to} className={`flex flex-col items-center justify-center p-4 rounded-lg transition-colors ${colorClasses[color]}`}>
       <Icon className="w-8 h-8 mb-2" />
-      <span className="text-sm font-medium text-center text-gray-800 dark:text-gray-200">
-        {label}
-      </span>
+      <span className="text-sm font-medium text-center text-gray-800 dark:text-gray-200">{label}</span>
     </Link>
   );
 };
 
 const QuickActions = () => (
   <div className="bg-white dark:bg-gray-800 p-6 rounded-xl shadow-lg border border-gray-200 dark:border-gray-700 h-full">
-    <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-4">
-      Actions Rapides
-    </h3>
-    <div className="grid grid-cols-4 gap-4">
-      {actions.map((action) => (
-        <ActionButton 
-          key={action.label} 
-          label={action.label} 
-          Icon={action.Icon} 
-          to={action.to} 
-          color={action.color} 
-        />
+    <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-4">Actions Rapides</h3>
+    <div className="grid grid-cols-2 gap-4">
+      {actions.map(action => (
+        <ActionButton key={action.label} {...action} />
       ))}
     </div>
   </div>
 );
 
-// EXPORT CORRIGÉ - Ajoutez cette ligne
 export default QuickActions;
